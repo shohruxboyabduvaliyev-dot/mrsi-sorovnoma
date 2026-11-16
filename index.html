@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Raqamli savodxonlik soʻrovnomasi</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--ink:#17202a;--mute:#5d6d7e;--line:#d5dbe1;--acc:#1a5fb4;--acc2:#e8f0fb;--ok:#1e8449;--bad:#b03a2e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:720px;margin:0 auto;padding:12px 16px 96px}
+h1{font-size:1.25rem;margin:12px 0 4px}
+h2{font-size:1.05rem;margin:0 0 6px}
+p{margin:6px 0}
+.mute{color:var(--mute);font-size:.92rem}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:8px 0 14px}
+.bar>i{display:block;height:100%;background:var(--acc);width:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:10px 0}
+.q{font-weight:600;margin-bottom:8px}
+.opts{display:grid;gap:8px}
+.opts.two{grid-template-columns:1fr 1fr}
+.opt{border:1px solid var(--line);background:#fff;border-radius:8px;padding:10px 12px;text-align:left;font:inherit;color:inherit;cursor:pointer;min-height:44px}
+.opt[aria-pressed="true"]{border-color:var(--acc);background:var(--acc2);font-weight:600}
+input[type=number],input[type=text],textarea,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;color:inherit}
+textarea{min-height:90px}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 16px}
+nav>div{max-width:720px;margin:0 auto;display:flex;gap:10px;align-items:center}
+button.go{flex:1;background:var(--acc);color:#fff;border:0;border-radius:8px;padding:12px;font:inherit;font-weight:600;cursor:pointer;min-height:46px}
+button.go:disabled{background:#9fb3c8;cursor:not-allowed}
+button.back{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font:inherit;cursor:pointer;min-height:46px}
+.note{background:#fff8e1;border:1px solid #f0d98c;border-radius:8px;padding:8px 12px;font-size:.9rem;margin:8px 0}
+.mail{border:1px solid var(--line);border-radius:8px;padding:10px;margin:8px 0;background:#fff}
+.mail b{display:block}.mail .from{color:var(--mute);font-size:.88rem;word-break:break-all}
+.mail label{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:.92rem}
+table.sheet{border-collapse:collapse;width:100%;max-width:340px}
+table.sheet td,table.sheet th{border:1px solid var(--line);padding:6px 8px;text-align:right}
+table.sheet th{background:#eef1f4;text-align:center;font-weight:600}
+table.sheet input{padding:6px;text-align:left}
+.res{border:1px solid var(--line);border-radius:8px;padding:10px;margin:8px 0;background:#fff;cursor:pointer}
+.res[aria-pressed="true"]{border-color:var(--acc);background:var(--acc2)}
+.res small{color:var(--mute);word-break:break-all}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;margin:8px 0}
+.row>*{min-width:0;overflow-wrap:anywhere}
+.big{font-size:2.4rem;font-weight:700;color:var(--acc);line-height:1.1}
+.meter{display:grid;grid-template-columns:130px 1fr 44px;gap:8px;align-items:center;margin:6px 0;font-size:.95rem}
+.meter>div{height:10px;background:var(--line);border-radius:5px;overflow:hidden}
+.meter>div>i{display:block;height:100%;background:var(--acc)}
+@media(max-width:480px){.opts.two{grid-template-columns:1fr}.meter{grid-template-columns:104px 1fr 40px}}
+</style>
+</head>
+<body>
+<main>
+<h1>Raqamli savodxonlik soʻrovnomasi</h1>
+<div class="bar"><i id="prog"></i></div>
+<div id="sinov" class="note" hidden>Sinov rejimi: javoblar faqat shu qurilmada saqlanadi, tadqiqot bazasiga yuborilmaydi.</div>
+<div id="ekran"></div>
+</main>
+<nav><div><button class="back" id="orqaga" hidden>Orqaga</button><button class="go" id="keyingi">Keyingi</button></div></nav>
+
+<script>
+"use strict";
+/* ---- Sozlama: baza ulanganda toʻldiriladi (OQING.md ga qarang) ---- */
+const CONFIG = { endpoint: "https://qpliwnitmjjotznxqmnl.supabase.co/rest/v1/javoblar", apikey: "sb_publishable_vitMYsfCD6_2CoFRDKPlZQ_btK_YiGl" };
+/* Manzilga ?sinov=1 qoʻshilsa, javob „1.0-sinov” deb belgilanadi va tahlilga kirmaydi */
+const VERSIYA = "1.0" + (new URLSearchParams(location.search).has("sinov") ? "-sinov" : "");
+
+/* ---- Savollar (matn sorovnoma_v1.md bilan bir xil) ---- */
+const HUDUD = ["Qoraqalpogʻiston R.","Andijon","Buxoro","Jizzax","Qashqadaryo","Navoiy","Namangan","Samarqand","Surxondaryo","Sirdaryo","Toshkent viloyati","Fargʻona","Xorazm","Toshkent shahri","Chet elda"];
+const talaba = a => a.A5 === 0 || a.A5 === 1;
+const A = [
+ {id:"A1",t:"num",q:"Yoshingiz (toʻliq yil)",min:16,max:85},
+ {id:"A2",q:"Jinsingiz",o:["Erkak","Ayol"]},
+ {id:"A3",q:"Maktabni (litsey, kollejni) qaysi hududda tugatgansiz?",o:HUDUD,two:1},
+ {id:"A4",q:"Maktab davrida qayerda yashagansiz?",o:["Viloyat markazi yoki Toshkent shahri","Boshqa shahar yoki tuman markazi","Qishloq"]},
+ {id:"A5",q:"Universitetdagi maqomingiz",o:["Bakalavr talabasi","Magistrant","Oʻqituvchi","Maʼmuriy xodim"]},
+ {id:"A6",q:"Kursingiz",o:["1","2","3","4","Magistratura 1","Magistratura 2"],two:1,if:talaba},
+ {id:"A7",q:"Yoʻnalishingiz (sohangiz)",o:["Iqtisodiyot va biznes","Axborot texnologiyalari","Pedagogika va tillar","Huquq","Boshqa"]},
+ {id:"A8",q:"Taʼlim shakli",o:["Kunduzgi","Kechki","Sirtqi","Masofaviy"],two:1,if:talaba},
+ {id:"A9",q:"Ota-onangizdan kamida biri oliy maʼlumotlimi?",o:["Ha","Yoʻq"],two:1},
+ {id:"A10",q:"Hozir ishlaysizmi?",o:["Ishlamayman","Toʻliqsiz ish kuni","Toʻliq ish kuni","Oʻz ishim (tadbirkorlik, frilans)"]},
+ {id:"A11",q:"Oʻtgan oydagi shaxsiy daromadingiz (ish haqi, stipendiya, boshqa)",o:["Daromadim yoʻq","1 mln soʻmgacha","1–3 mln","3–5 mln","5–10 mln","10 mln soʻmdan koʻp","Aytishni istamayman"]},
+ {id:"A12",q:"Oxirgi 12 oyda internet orqali pul ishlaganmisiz (frilans, onlayn savdo, kontent)?",o:["Ha","Yoʻq"],two:1},
+ {id:"A13",t:"num",q:"Kompyuter yoki smartfondan necha yoshingizdan muntazam foydalana boshlagansiz?",min:3,max:85},
+ {id:"A14",q:"Maktabingizda oʻquvchilar foydalana oladigan internet bormidi?",o:["Ha","Yoʻq","Eslay olmayman"]},
+];
+const B = [
+ {id:"B1",q:"Shaxsiy smartfoningiz bormi?",o:["Ha","Yoʻq"],two:1,w:[1,0]},
+ {id:"B2",q:"Kompyuter yoki noutbukingiz bormi?",o:["Ha, shaxsiy","Oilada umumiy","Yoʻq"],w:[1,.5,0]},
+ {id:"B3",q:"Yashash joyingizda qanday internet bor?",o:["Simli (Wi-Fi) va mobil","Faqat mobil","Internet yoʻq"],w:[1,.5,0]},
+ {id:"B4",q:"Internetingiz onlayn dars (video) uchun yetarlimi?",o:["Yetarli","Baʼzan uziladi","Yetarli emas"],w:[1,.5,0]},
+];
+const CSH = ["Qila olmayman","Yordam bilan qila olaman","Mustaqil qila olaman","Boshqalarga oʻrgata olaman"];
+const C = [
+ ["C1","Kerakli maʼlumotni qidiruv tizimida aniq soʻrov yozib topish"],
+ ["C2","Internetdagi maʼlumot ishonchliligini tekshirish (muallif, sana, manba)"],
+ ["C3","Fayllarni papkalarga tartiblash va bulutli xotirada saqlash"],
+ ["C4","Elektron xatga fayl ilova qilib yuborish"],
+ ["C5","Onlayn hujjatda boshqalar bilan bir vaqtda ishlash"],
+ ["C6","Davlat xizmatlari portali orqali onlayn ariza yuborish"],
+ ["C7","Matn muharririda hujjatni rasmiylashtirish (sarlavha, jadval, sahifa raqami)"],
+ ["C8","Elektron jadvalda formula yozib hisoblash"],
+ ["DQ","Bu qatorda „Yordam bilan qila olaman” javobini belgilang."],
+ ["C9","Taqdimot tayyorlash"],
+ ["C10","Kuchli parol qoʻyish va ikki bosqichli tasdiqlashni yoqish"],
+ ["C11","Firibgarlik xabari yoki soxta havolani tanish"],
+ ["C12","Ijtimoiy tarmoq yoki ilovada maxfiylik sozlamalarini oʻzgartirish"],
+ ["C13","Dastur yoki ilovani topib oʻrnatish va sozlash"],
+ ["C14","Texnik nosozlik yechimini internetdan topib, oʻzim bartaraf etish"],
+ ["C15","Oʻqish yoki ishda sunʼiy intellekt vositasidan foydalanish va natijasini tekshirish"],
+].map(([id,q])=>({id,q,o:CSH,two:1}));
+const DSH = ["Eshitmaganman","Eshitganman, lekin tushuntira olmayman","Tushuntirib bera olaman"];
+const D = [["D1","Fishing"],["D2","Bulutli saqlash"],["D3","Ikki bosqichli autentifikatsiya"],["D4","VPN"],["D5","Kuki (cookie) fayllar"],["D6","Elektron raqamli imzo"],["D7","QR kod"],["D8","RGT-4 shifrlash standarti"],["D9","Kvant-piksel keshlash"],["D10","Delta-sinxron bufer protokoli"]].map(([id,q])=>({id,q,o:DSH}));
+/* E: birinchi variant — toʻgʻri javob; ekranda tartib aralashtiriladi */
+const E = [
+ ["E1","Qidiruv tizimida aynan „raqamli savodxonlik indeksi” iborasi qatnashgan sahifalarni topish uchun nima qilinadi?",["Iborani qoʻshtirnoq ichida yozish","Soʻzlar orasiga vergul qoʻyish","Hammasini bosh harf bilan yozish","Oxiriga soʻroq belgisi qoʻyish"]],
+ ["E2","Sunʼiy intellekt vositasi bergan statistik raqamni kurs ishiga yozishdan oldin nima qilish kerak?",["Asl manbadan tekshirish, chunki u xato yoki oʻylab topilgan raqam berishi mumkin","Hech narsa, u doim toʻgʻri","Savolni qayta berib, javob takrorlansa ishonish","Raqamni biroz yaxlitlab yozish"]],
+ ["E3","Besh kishi bitta hujjatni bir vaqtda tahrirlashi kerak. Eng qulay yoʻl qaysi?",["Bulutli hujjat havolasini tahrirlash huquqi bilan ulashish","Faylni navbat bilan bir-biriga yuborish","Har kim alohida nusxada ishlab, oxirida birlashtirish","Faylni fleshkada tarqatish"]],
+ ["E4","2 GB hajmli videoni kursdoshingizga yuborishingiz kerak. Eng maqbul yoʻl qaysi?",["Bulutli xotiraga yuklab, havolasini yuborish","Elektron xatga ilova qilish","Videoni matn fayliga aylantirish","Skrinshotlarini yuborish"]],
+ ["E5","Hujjat boshqa qurilmada ochilganda koʻrinishi oʻzgarmasligi uchun uni qaysi formatda yuborgan maʼqul?",["PDF","DOCX","TXT","XLSX"]],
+ ["E6","Internetdan topilgan rasmni taqdimotingizda ishlatmoqchisiz. Qaysi harakat toʻgʻri?",["Foydalanish shartini (litsenziyasini) tekshirish va manbasini koʻrsatish","Internetdagi hamma rasm bepul, shunchaki olish","Rasmdagi suv belgisini kesib tashlash","Rasm nomini oʻzgartirib saqlash"]],
+ ["E7","Oʻzini bank xodimi deb tanishtirgan kishi qoʻngʻiroq qilib, kartangizni „blokdan chiqarish” uchun SMS orqali kelgan kodni soʻradi. Nima qilasiz?",["Kodni hech kimga aytmayman va bankning rasmiy raqamiga oʻzim qoʻngʻiroq qilaman","Kodni aytaman, chunki u bank xodimi","Kodning yarmini aytaman","Kodni SMS orqali yuboraman"]],
+ ["E8","Telefonda xotira toʻlgani uchun yangi ilova oʻrnatilmayapti. Birinchi navbatda nima qilasiz?",["Keraksiz fayl va ilovalarni oʻchiraman yoki bulutga koʻchiraman","Yangi telefon sotib olaman","Telefonni zaryadga qoʻyaman","Internetni oʻchirib yoqaman"]],
+ ["E9","Onlayn toʻlov amalga oshmadi, lekin kartadan pul yechildi. Eng toʻgʻri qadam qaysi?",["Toʻlov vaqti va raqamini saqlab, bank yoki ilovaning yordam xizmatiga murojaat qilish","Toʻlovni yana bir necha marta takrorlash","Ilovani oʻchirib tashlash","Kartani boshqa odamga berish"]],
+ ["E10","100 nafar talabaning oʻrtacha bahosini hisoblab, diagramma chizish kerak. Qaysi dastur turi mos?",["Elektron jadval","Matn muharriri","Taqdimot dasturi","Rasm muharriri"]],
+].map(([id,q,o])=>({id,q,o}));
+const F = [["F1","Fayl ilova qilingan elektron xat yubordim"],["F2","Elektron jadvalda formula ishlatdim"],["F3","Taqdimot yaratdim"],["F4","Dastur yoki ilovani topib, oʻrnatib, sozladim"],["F5","Qurilma, hisob yoki ilovada maxfiylik sozlamalarini oʻzgartirdim"],["F6","Internetda topgan maʼlumot ishonchliligini tekshirdim"],["F7","Internet-banking yoki toʻlov ilovasidan foydalandim"],["F8","Onlayn kursda oʻqidim"],["F9","Internet orqali tovar yoki xizmat sotib oldim"],["F10","Davlat xizmatidan onlayn foydalandim"],["F11","Oʻqish yoki ish uchun sunʼiy intellekt vositasidan foydalandim"]].map(([id,q])=>({id,q,o:["Ha","Yoʻq"],two:1}));
+const KSH = ["Umuman qoʻshilmayman","Qoʻshilmayman","Qoʻshilaman","Toʻliq qoʻshilaman"];
+const K = [
+ {id:"K1",q:"Jadvalda hisob-kitob kerak boʻlsa, formulani oʻzim yozmayman, boshqadan iltimos qilaman.",o:KSH,two:1},
+ {id:"K2",q:"Ilovalardagi maxfiylik sozlamalari qayerda turishini bilmayman.",o:KSH,two:1},
+ {id:"K3",q:"Elektron xatga fayl ilova qilishni bilmayman.",o:KSH,two:1},
+ {id:"K4",t:"num",q:"Tugʻilgan yilingiz",min:1940,max:2012},
+];
+const XATLAR = [
+ {kim:"Namuna Bank",manzil:"xabar@namunabank.uz",mavzu:"Oktabr oyi koʻchirmasi tayyor",matn:"Koʻchirmani bank ilovasining „Koʻchirmalar” boʻlimida koʻrishingiz mumkin."},
+ {kim:"Namuna Bank Bonus",manzil:"bonus@namunabank-bonus.com",mavzu:"Kartangiz 24 soat ichida bloklanadi!",matn:"Bloklanmaslik uchun havola orqali karta raqami va SMS kodni zudlik bilan kiriting."},
+ {kim:"Dekanat",manzil:"dekanat@namunauniversitet.uz",mavzu:"Dars jadvali oʻzgardi",matn:"Dushanba kungi seminar 3-juftlikka koʻchirildi. Yangi jadval ilovada."},
+ {kim:"Yetkazib berish xizmati",manzil:"info@pochta-yetkazish.top",mavzu:"Posilkangiz ushlab qolindi",matn:"5 000 soʻm toʻlash uchun havolaga oʻting va karta maʼlumotlaringizni kiriting. Aks holda posilka qaytariladi."},
+ {kim:"Dilshod",manzil:"dilshod.t@namunauniversitet.uz",mavzu:"Seminar taqdimoti",matn:"Salom, kechagi kelishganimizdek taqdimotning mening qismimni yuboryapman."},
+];
+const SOXTA_XAT = [1,3];
+const NATIJALAR = [
+ {nom:"Oʻzbekiston aholisi: hayratlanarli raqamlar! Bosing",manba:"Reklama · aholi-soni-2026.info"},
+ {nom:"„Menimcha 40 milliondan oshgan” — foydalanuvchi javobi",manba:"forum.namuna.uz"},
+ {nom:"Demografik holat: rasmiy press-reliz",manba:"stat.uz · Milliy statistika qoʻmitasi"},
+ {nom:"Oʻzbekiston haqida 10 ta qiziqarli fakt",manba:"top-faktlar.blog"},
+];
+const SONLAR = [120,85,240,60,95];
+const SOHA = {Axborot:["E1","E2","S4"],Muloqot:["E3","E4","S5"],Kontent:["E5","E6","S2"],Xavfsizlik:["E7","S1","S3"],Muammo:["E8","E9","E10"]};
+const CID = C.filter(c=>c.id!=="DQ").map(c=>c.id);
+
+/* ---- Ball hisoblash (sorovnoma_v1.md, „Ball hisoblash” va „Sifat belgilari”) ---- */
+function formulaTogri(s){
+ const n = String(s||"").replace(/\s+/g,"").toUpperCase().replace(/В/g,"B");
+ const kerak = "B2,B3,B4,B5,B6";
+ if(/^=(SUM|СУММ)\(B2:B6\)$/.test(n)) return true;
+ const m = n.match(/^=(?:SUM|СУММ)\((.+)\)$/);
+ if(m && m[1].split(/[;,]/).sort().join(",")===kerak) return true;
+ return n[0]==="=" && n.slice(1).split("+").sort().join(",")===kerak;
+}
+function parolBall(s){
+ s = String(s||"");
+ const tur = [/[a-zа-яёўқғҳ]/,/[A-ZА-ЯЁЎҚҒҲ]/,/\d/,/[^\p{L}\d]/u].filter(r=>r.test(s)).length;
+ const oddiy = /(12345|qwerty|password|parol|11111|abcde)/i.test(s);
+ if(s.length>=12 && tur===4 && !oddiy) return 1;
+ if(s.length>=8 && tur>=3 && !oddiy) return .5;
+ return 0;
+}
+function topshiriqBall(a){
+ const b = {};
+ for(const e of E) b[e.id] = a[e.id]===0 ? 1 : 0;
+ const bel = a.S1||[]; const xato = bel.some(i=>!SOXTA_XAT.includes(i)); const topdi = SOXTA_XAT.filter(i=>bel.includes(i)).length;
+ b.S1 = xato ? 0 : topdi===2 ? 1 : topdi===1 ? .5 : 0;
+ b.S2 = formulaTogri(a.S2) ? 1 : 0;
+ b.S3 = a.S3_ball||0;
+ b.S4 = a.S4===2 ? 1 : 0;
+ const s5 = a.S5||{}; b.S5 = (s5.fayl===0?.5:0) + (s5.k1==="bcc"&&s5.k2==="bcc"?.5:0);
+ return b;
+}
+const ort = x => x.reduce((s,v)=>s+v,0)/x.length;
+function hisobla(a, yil){
+ yil = yil || new Date().getFullYear();
+ const tb = topshiriqBall(a);
+ const soha = {}; for(const [s,ids] of Object.entries(SOHA)) soha[s] = 100*ort(ids.map(i=>tb[i]));
+ const kirish = 100*ort(B.map(b=>b.w[a[b.id]] ?? 0));
+ const konikma = ort(Object.values(soha));
+ const foyd = 100*ort(F.map(f=>a[f.id]===0?1:0));
+ const g = x => 1+99*x/100;
+ const indeks = Math.cbrt(g(kirish)*g(konikma)*g(foyd));
+ const ozbaho = 100*ort(CID.map(i=>a[i]??0))/3;
+ const zid = (c,k)=> (a[c]>=2 && a[k]>=2) || (a[c]===0 && a[k]===0);
+ const q4n = [zid("C8","K1"),zid("C12","K2"),zid("C4","K3"), Math.abs((yil-a.K4)-a.A1)>1].filter(Boolean).length;
+ const q3n = ["D8","D9","D10"].filter(i=>a[i]===2).length;
+ return {
+  ball:{kirish,konikma,foyd,indeks,ozbaho,farq:ozbaho-konikma,soha,topshiriq:tb},
+  belgi:{q1:a.DQ!==1, q3n, q3:q3n>=2, q4n, q4:q4n>=2, q5:new Set(CID.map(i=>a[i])).size===1}
+ };
+}
+
+/* ---- Interfeys ---- */
+const $ = s => document.querySelector(s);
+function el(tag, attrs, ...kids){
+ const e = document.createElement(tag);
+ for(const [k,v] of Object.entries(attrs||{})){
+  if(k==="class") e.className=v; else if(k.startsWith("on")) e.addEventListener(k.slice(2),v);
+  else if(v===true) e.setAttribute(k,""); else if(v!==false && v!=null) e.setAttribute(k,v);
+ }
+ for(const k of kids.flat()){ if(k==null||k===false) continue; e.append(k.nodeType?k:document.createTextNode(k)); }
+ return e;
+}
+function aralash(n){ const p=[...Array(n).keys()]; for(let i=n-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[p[i],p[j]]=[p[j],p[i]];} return p; }
+const st = {a:{}, i:0, ts:{}, kirdi:0, boshi:0, tartib:{}};
+function tartib(id,n){ return st.tartib[id] || (st.tartib[id]=aralash(n)); }
+
+function savolKarta(it, opt){
+ opt = opt||{};
+ const k = el("div",{class:"card"}, el("div",{class:"q"}, it.q));
+ if(it.t==="num"){
+  k.append(el("input",{type:"number",inputmode:"numeric",min:it.min,max:it.max,value:st.a[it.id]??"",oninput:e=>{
+   const v=Number(e.target.value); if(e.target.value!=="" && Number.isInteger(v) && v>=it.min && v<=it.max) st.a[it.id]=v; else delete st.a[it.id]; yangila();
+  }}));
+  return k;
+ }
+ const tart = opt.aralash ? tartib(it.id,it.o.length) : it.o.map((_,i)=>i);
+ const box = el("div",{class:"opts"+(it.two?" two":"")});
+ const chiz = () => { box.replaceChildren(...tart.map(i=>el("button",{class:"opt",type:"button","aria-pressed":String(st.a[it.id]===i),onclick:()=>{st.a[it.id]=i; if(opt.qayta) koʻrsat(); else {chiz(); yangila();}}}, it.o[i])),
+  ...(opt.bilmayman ? [el("button",{class:"opt",type:"button","aria-pressed":String(st.a[it.id]===-1),onclick:()=>{st.a[it.id]=-1;chiz();yangila();}},"Bilmayman")] : [])); };
+ chiz(); k.append(box); return k;
+}
+function oddiyEkran(id, sarlavha, kirish, items, opt){
+ return {id, sarlavha, ...opt,
+  chiz(root){ if(kirish) root.append(el("p",{class:"mute"},kirish));
+   for(const it of items){ if(it.if && !it.if(st.a)){ delete st.a[it.id]; continue; } root.append(savolKarta(it,{aralash:opt&&opt.aralash,bilmayman:opt&&opt.bilmayman,qayta:items.some(x=>x.if)&&!it.t})); } },
+  tayyor(){ return items.every(it=>(it.if && !it.if(st.a)) || st.a[it.id]!==undefined); } };
+}
+const ekranlar = [
+ {id:"rozilik", sarlavha:"Ishtirok etishga rozilik", tugma:"Boshlash",
+  chiz(root){
+   root.append(el("div",{class:"card"},
+    el("p",null,"Ushbu soʻrovnoma magistrlik dissertatsiyasi doirasida raqamli savodxonlikni oʻlchash usulini sinash uchun oʻtkaziladi. Ishtirok ixtiyoriy, istalgan paytda toʻxtatish mumkin."),
+    el("p",null,"Ism, telefon raqami va guruh raqami soʻralmaydi; javoblar faqat umumlashtirilgan holda tahlil qilinadi. Toʻldirish 13–15 daqiqa oladi."),
+    el("p",null,"Ayrim savollarning toʻgʻri javobi bor — bilmasangiz „Bilmayman” ni tanlang, taxmin qilmang. Oxirida oʻz natijangizni koʻrasiz."),
+    el("label",{style:"display:flex;gap:10px;align-items:flex-start;margin-top:10px"}, el("input",{type:"checkbox",id:"roziman",checked:!!st.a.rozi,onchange:e=>{st.a.rozi=e.target.checked;yangila();}}), "Men 16 yoshdan kattaman va ishtirok etishga roziman.")));
+  }, tayyor(){return !!st.a.rozi;}},
+ oddiyEkran("A1","Oʻzingiz haqingizda",null,A.slice(0,8)),
+ oddiyEkran("A2","Oʻzingiz haqingizda (davomi)",null,A.slice(8)),
+ oddiyEkran("B","Qurilma va internet",null,B),
+ oddiyEkran("C1","Nimalarni qila olasiz?","Har bir ish uchun oʻzingizga mos javobni belgilang.",C.slice(0,9)),
+ oddiyEkran("C2","Nimalarni qila olasiz? (davomi)",null,C.slice(9)),
+ {...oddiyEkran("D","Atamalar","Quyidagi atamalar sizga qanchalik tanish?",[]), chiz(root){ root.append(el("p",{class:"mute"},"Quyidagi atamalar sizga qanchalik tanish?")); for(const i of tartib("D",D.length)) root.append(savolKarta(D[i])); }, tayyor(){return D.every(d=>st.a[d.id]!==undefined);} },
+ ...E.map((e,n)=>oddiyEkran(e.id,`Savol ${n+1} / ${E.length}`,"Toʻgʻri javobni tanlang. Bilmasangiz — „Bilmayman”.",[e],{aralash:1,bilmayman:1,qulf:1})),
+ {id:"S1", sarlavha:"Topshiriq 1 / 5: pochta qutisi", qulf:1,
+  chiz(root){ st.a.S1 = st.a.S1||[]; st.a.S1_korildi = true;
+   root.append(el("p",null,"Pochtangizga 5 ta xat keldi. Firibgarlik deb hisoblagan xatlaringizni belgilang. Hech biri shubhali boʻlmasa, belgilamang."));
+   XATLAR.forEach((x,i)=>root.append(el("div",{class:"mail"}, el("b",null,x.mavzu), el("div",{class:"from"},`${x.kim} <${x.manzil}>`), el("div",null,x.matn),
+    el("label",null, el("input",{type:"checkbox",checked:st.a.S1.includes(i),onchange:e=>{ st.a.S1 = e.target.checked ? [...st.a.S1,i].sort() : st.a.S1.filter(v=>v!==i); }}), "Bu firibgarlik xati"))));
+  }, tayyor(){return true;}},
+ {id:"S2", sarlavha:"Topshiriq 2 / 5: jadval", qulf:1,
+  chiz(root){
+   root.append(el("p",null,"B7 katagiga B2 dan B6 gacha boʻlgan sonlar yigʻindisini hisoblaydigan formula yozing. Bilmasangiz, boʻsh qoldiring."));
+   const t = el("table",{class:"sheet"}, el("tr",null,el("th",null,""),el("th",null,"A"),el("th",null,"B")),
+    el("tr",null,el("th",null,"1"),el("td",{style:"text-align:left"},"Oy"),el("td",null,"Xarajat")),
+    ...SONLAR.map((s,i)=>el("tr",null,el("th",null,String(i+2)),el("td",{style:"text-align:left"},["Yanvar","Fevral","Mart","Aprel","May"][i]),el("td",null,String(s)))),
+    el("tr",null,el("th",null,"7"),el("td",{style:"text-align:left"},"Jami"),el("td",null,el("input",{type:"text",autocomplete:"off",autocapitalize:"off",spellcheck:"false",placeholder:"=",value:st.a.S2||"",oninput:e=>{st.a.S2=e.target.value;}}))));
+   root.append(t);
+  }, tayyor(){return true;}},
+ {id:"S3", sarlavha:"Topshiriq 3 / 5: parol", qulf:1,
+  chiz(root){
+   root.append(el("p",null,"Yangi hisob ochyapsiz deb tasavvur qiling. Shu hisob uchun ishonchli deb hisoblagan parolni oʻylab toping va yozing."),
+    el("div",{class:"note"},"Haqiqiy parolingizni yozmang. Yozgan parolingiz saqlanmaydi — faqat uning mustahkamlik bahosi yoziladi."),
+    el("input",{type:"text",autocomplete:"off",autocapitalize:"off",spellcheck:"false",oninput:e=>{st.a.S3_ball=parolBall(e.target.value); st.a.S3_yozdi=e.target.value.length>0;}}));
+  }, tayyor(){return true;}},
+ {id:"S4", sarlavha:"Topshiriq 4 / 5: qidiruv natijalari", qulf:1,
+  chiz(root){
+   root.append(el("p",null,"Siz „Oʻzbekiston aholisi soni” deb qidirdingiz. Kurs ishida foydalanish uchun eng ishonchli manbani tanlang."));
+   const box = el("div"); const chiz = ()=>box.replaceChildren(...tartib("S4",4).map(i=>el("div",{class:"res",role:"button",tabindex:"0","aria-pressed":String(st.a.S4===i),onclick:()=>{st.a.S4=i;chiz();yangila();}}, el("small",null,NATIJALAR[i].manba), el("div",null,NATIJALAR[i].nom))),
+    el("button",{class:"opt",type:"button","aria-pressed":String(st.a.S4===-1),onclick:()=>{st.a.S4=-1;chiz();yangila();}},"Bilmayman"));
+   chiz(); root.append(box);
+  }, tayyor(){return st.a.S4!==undefined;}},
+ {id:"S5", sarlavha:"Topshiriq 5 / 5: xat yuborish", qulf:1,
+  chiz(root){ st.a.S5 = st.a.S5||{fayl:null,k1:"",k2:""};
+   const joy = k => el("select",{onchange:e=>{st.a.S5[k]=e.target.value;yangila();}}, ...[["","— tanlang —"],["to","Kimga"],["cc","Nusxa (Cc)"],["bcc","Yashirin nusxa (Bcc)"],["yoq","Qoʻshmayman"]].map(([v,t])=>el("option",{value:v,selected:st.a.S5[k]===v},t)));
+   root.append(el("p",null,"Oʻqituvchiga hisobot faylini yuboring. Ikki kursdoshingiz ham xatni olsin, lekin ular bir-birining manzilini koʻrmasin."),
+    el("div",{class:"card"}, el("div",{class:"row"},el("span",null,"Kimga:"),el("b",null,"oqituvchi@namunauniversitet.uz")),
+     el("div",{class:"row"},el("span",null,"aziza@namunauniversitet.uz"),joy("k1")), el("div",{class:"row"},el("span",null,"bobur@namunauniversitet.uz"),joy("k2")),
+     el("div",{class:"row"},el("span",null,"Ilova qilinadigan fayl:"), el("select",{onchange:e=>{st.a.S5.fayl=e.target.value===""?null:Number(e.target.value);yangila();}}, ...[["","— tanlang —"],["0","hisobot.pdf"],["1","rasm.jpg"],["2","Fayl ilova qilmayman"]].map(([v,t])=>el("option",{value:v,selected:String(st.a.S5.fayl??"")===v},t))))));
+  }, tayyor(){const s=st.a.S5||{}; return s.fayl!==null && s.fayl!==undefined && s.k1 && s.k2;}},
+ oddiyEkran("F","Oxirgi 3 oyda","Oxirgi 3 oy ichida quyidagilarni bajardingizmi?",F),
+ oddiyEkran("K","Yana bir necha savol","Fikrga qanchalik qoʻshilasiz?",K),
+ {id:"yakun", sarlavha:"Yakun", tugma:"Yuborish va natijani koʻrish",
+  chiz(root){ root.append(el("div",{class:"card"}, el("div",{class:"q"},"Fikr yoki taklifingiz boʻlsa yozing (ixtiyoriy)"), el("textarea",{maxlength:"1000",oninput:e=>{st.a.fikr=e.target.value;}}, st.a.fikr||""))); }, tayyor(){return true;}},
+];
+
+function yangila(){ const e=ekranlar[st.i]; if(e) $("#keyingi").disabled = !e.tayyor(); }
+function koʻrsat(){
+ const e = ekranlar[st.i], root = $("#ekran");
+ root.replaceChildren(el("h2",null,e.sarlavha)); e.chiz(root);
+ $("#prog").style.width = (100*st.i/ekranlar.length)+"%";
+ $("#keyingi").textContent = e.tugma||"Keyingi";
+ $("#orqaga").hidden = !(st.i>1 && !e.qulf && !ekranlar[st.i-1].qulf);
+ yangila();
+}
+function vaqtYoz(){ const id=ekranlar[st.i].id; st.ts[id]=(st.ts[id]||0)+(Date.now()-st.kirdi)/1000; st.kirdi=Date.now(); }
+$("#keyingi").onclick = () => {
+ if(!ekranlar[st.i].tayyor()) return;
+ if(st.i===0){ st.boshi=Date.now(); st.kirdi=Date.now(); } else vaqtYoz();
+ st.i++; if(st.i>=ekranlar.length) return tugat();
+ koʻrsat(); scrollTo(0,0);
+};
+$("#orqaga").onclick = () => { vaqtYoz(); st.i--; koʻrsat(); scrollTo(0,0); };
+
+/* ---- Saqlash ---- */
+const LS = { oʻqi(k,d){ try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch(_){ return d; } }, yoz(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(_){} } };
+function yozuvTuz(){
+ const a = {...st.a}; delete a.rozi;
+ const h = hisobla(a);
+ const sek = Math.round((Date.now()-st.boshi)/1000);
+ const ekran_sek = Object.fromEntries(Object.entries(st.ts).map(([k,v])=>[k,Math.round(v)]));
+ return {id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random().toString(16).slice(2)), versiya:VERSIYA, vaqt:new Date().toISOString(), sek, ekran_sek, javob:a, ball:h.ball, belgi:h.belgi};
+}
+async function yubor(y){
+ if(!CONFIG.endpoint) return "sinov";
+ try{
+  const h = {"Content-Type":"application/json","apikey":CONFIG.apikey,"Prefer":"return=minimal"};
+  if(CONFIG.apikey.startsWith("eyJ")) h.Authorization = "Bearer "+CONFIG.apikey; /* faqat eski (JWT) kalit uchun */
+  const r = await fetch(CONFIG.endpoint,{method:"POST",headers:h,body:JSON.stringify({id:y.id,versiya:y.versiya,malumot:y})});
+  return (r.ok || r.status===409) ? "ok" : "xato"; /* 409: shu id avval saqlangan */
+ }catch(_){ return "xato"; }
+}
+async function tugat(){
+ const y = yozuvTuz();
+ LS.yoz("mrsi_javoblar",[...LS.oʻqi("mrsi_javoblar",[]),y]);
+ LS.yoz("mrsi_oxirgi",y);
+ $("#keyingi").disabled = true; $("#keyingi").textContent = "Yuborilmoqda…";
+ const holat = await yubor(y);
+ natija(y, holat);
+}
+function natija(y, holat){
+ const b = y.ball, r = x => Math.round(x);
+ document.querySelector("nav").hidden = true; $("#prog").style.width="100%";
+ const m = (nom,v) => el("div",{class:"meter"}, el("span",null,nom), el("div",null,el("i",{style:`width:${Math.max(0,Math.min(100,v))}%`})), el("b",null,String(r(v))));
+ const farq = b.farq>15 ? "Oʻz bahoingiz topshiriqlardagi natijangizdan yuqoriroq chiqdi." : b.farq<-15 ? "Oʻz bahoingiz topshiriqlardagi natijangizdan pastroq chiqdi — siz oʻylaganingizdan koʻproq narsani bilasiz." : "Oʻz bahoingiz topshiriqlardagi natijangizga yaqin.";
+ $("#ekran").replaceChildren(
+  el("h2",null,"Sizning natijangiz"),
+  ...(holat==="xato" ? [el("div",{class:"note"},"Javobingiz bazaga yuborilmadi (internet uzilgan boʻlishi mumkin). Sahifani yopmang va ", el("button",{class:"back",onclick:async e=>{e.target.disabled=true; const h=await yubor(y); natija(y,h);}},"qayta yuboring"),".")] : []),
+  el("div",{class:"card"}, el("div",{class:"mute"},"Raqamli savodxonlik indeksi (1–100)"), el("div",{class:"big"},String(r(b.indeks))), m("Kirish",b.kirish), m("Koʻnikma",b.konikma), m("Foydalanish",b.foyd)),
+  el("div",{class:"card"}, el("div",{class:"q"},"Koʻnikma sohalari boʻyicha"), ...Object.entries(b.soha).map(([s,v])=>m(s,v))),
+  el("div",{class:"card"}, el("div",{class:"q"},"Oʻz bahosi va topshiriqlar"), m("Oʻz bahosi",b.ozbaho), m("Topshiriqlar",b.konikma), el("p",null,farq)),
+  el("p",{class:"mute"},"Bu natija soʻrovnomaning sinov variantidagi topshiriqlar boʻyicha hisoblangan va rasmiy baho emas. Ishtirokingiz uchun rahmat!"));
+ scrollTo(0,0);
+}
+
+/* ---- Boshqaruv koʻrinishi (#admin): faqat shu qurilmadagi sinov javoblari ---- */
+function tekisla(y){ const o={id:y.id,versiya:y.versiya,vaqt:y.vaqt,sek:y.sek};
+ for(const [k,v] of Object.entries(y.javob)) o[k] = (v&&typeof v==="object") ? JSON.stringify(v) : v;
+ for(const [k,v] of Object.entries(y.ball)) if(typeof v==="number") o["b_"+k]=Math.round(v*100)/100;
+ for(const [k,v] of Object.entries(y.ball.soha)) o["soha_"+k]=Math.round(v*100)/100;
+ for(const [k,v] of Object.entries(y.ball.topshiriq)) o["t_"+k]=v;
+ for(const [k,v] of Object.entries(y.belgi)) o[k]=typeof v==="boolean"?Number(v):v;
+ for(const [k,v] of Object.entries(y.ekran_sek)) o["sek_"+k]=v; return o; }
+function csv(ys){ const qator=ys.map(tekisla); const ust=[...new Set(qator.flatMap(q=>Object.keys(q)))];
+ const q = v => v==null ? "" : /[",;\n]/.test(String(v)) ? '"'+String(v).replace(/"/g,'""')+'"' : String(v);
+ return "﻿"+[ust.join(";"),...qator.map(r=>ust.map(u=>q(r[u])).join(";"))].join("\r\n"); }
+function admin(){
+ const ys = LS.oʻqi("mrsi_javoblar",[]); document.querySelector("nav").hidden=true;
+ $("#ekran").replaceChildren(el("h2",null,"Shu qurilmadagi javoblar"), el("p",null,`Saqlangan javoblar soni: ${ys.length}`),
+  el("button",{class:"back",onclick:()=>{ const u=URL.createObjectURL(new Blob([csv(ys)],{type:"text/csv"})); const a=el("a",{href:u,download:"mrsi_javoblar.csv"}); document.body.append(a); a.click(); a.remove(); }},"CSV yuklab olish"),
+  el("p",{class:"mute"},"Bu roʻyxat faqat shu brauzerda toʻldirilgan javoblarni koʻrsatadi."));
+}
+
+window.MRSI = {hisobla, formulaTogri, parolBall, topshiriqBall, csv, ekranlar, st};
+$("#sinov").hidden = !!CONFIG.endpoint;
+if(location.hash==="#admin") admin();
+else if(LS.oʻqi("mrsi_oxirgi",null) && location.hash!=="#qayta") natija(LS.oʻqi("mrsi_oxirgi"),"ok");
+else koʻrsat();
+</script>
+</body>
+</html>
